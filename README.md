@@ -394,6 +394,10 @@ Table of every integrated data source and how many assets it has contributed. Ea
 ![2.4](images/2.4.png)
 ---
 
+## Video Demo can be downloaded from below link
+
+https://github.com/woranonv/EP2-Splunk-Mythos-CISA-BOD26-04-vuln-prioritization-Dashboard/releases/download/v1.0/Mythos_ERA_BOD26-04.Risk.Based.Dashboard.mov
+
 ## Files in this repo
 
 | File | Purpose |
