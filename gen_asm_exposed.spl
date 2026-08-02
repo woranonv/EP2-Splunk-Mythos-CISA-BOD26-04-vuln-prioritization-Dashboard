@@ -1,0 +1,18 @@
+/* ============================================================
+   GENERATOR 2 — ASM (attack surface management) exposure lookup
+   Public exposure must come from an external-attack-surface view,
+   NOT from EA's ip_translated (that is outbound NAT, not inbound).
+   This simulates an ASM export: ~30 internet-reachable servers.
+   Run once in Search UI. Creates: asm_exposed_assets.csv
+   ============================================================ */
+
+| inputlookup ea_network_asset_inventory
+| where asset_type="Server"
+| eval h=tonumber(substr(md5(nt_host),1,7),16)
+| where (h%12)<1
+| eval external_ip=(52+(h%3)).".".(10+(h%80)).".".((h%200)+10).".".((h%240)+5)
+| eval service=case((h%4)==0,"https/443",(h%4)==1,"http/80",(h%4)==2,"ssh/22",true(),"rdp/3389")
+| eval first_seen_external=strftime(now()-((h%120)+10)*86400,"%Y-%m-%d")
+| eval asm_source="external_asm_scan"
+| table nt_host external_ip service first_seen_external asm_source
+| outputlookup asm_exposed_assets.csv
