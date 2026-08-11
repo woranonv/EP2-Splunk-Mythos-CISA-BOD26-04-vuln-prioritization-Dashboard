@@ -1,0 +1,501 @@
+{
+  "title": "Mythos Era - BOD 26-04 Prioritization + EA Visibility",
+  "description": "Part 1: CISA BOD 26-04 risk-based patch prioritization (real scanned servers). Part 2: Exposure Analytics visibility - shadow assets, unscanned servers, missing EDR.",
+  "inputs": {
+    "input_priority": {
+      "type": "input.dropdown",
+      "title": "Priority Tier",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "P1 - Urgent (3 days)", "value": "P1"},
+          {"label": "P2 - High (14 days)", "value": "P2"},
+          {"label": "P3 - Medium (60 days)", "value": "P3"},
+          {"label": "P4 - Planned (next upgrade)", "value": "P4"}
+        ],
+        "defaultValue": "P1",
+        "token": "sel_priority"
+      }
+    },
+    "input_sla": {
+      "type": "input.dropdown",
+      "title": "SLA Status",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Overdue", "value": "overdue"},
+          {"label": "Within SLA", "value": "within_sla"},
+          {"label": "Next system upgrade", "value": "next_system_upgrade"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_sla"
+      }
+    },
+    "input_edr": {
+      "type": "input.dropdown",
+      "title": "EDR Installed",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Yes", "value": "yes"},
+          {"label": "No", "value": "no"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_edr"
+      }
+    },
+    "input_kev": {
+      "type": "input.dropdown",
+      "title": "In KEV",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Yes", "value": "yes"},
+          {"label": "No", "value": "no"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_kev"
+      }
+    },
+    "input_exposed": {
+      "type": "input.dropdown",
+      "title": "Exposed Internet",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Yes", "value": "yes"},
+          {"label": "No", "value": "no"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_exposed"
+      }
+    },
+    "input_asset_priority": {
+      "type": "input.dropdown",
+      "title": "Asset Priority",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Critical", "value": "critical"},
+          {"label": "High", "value": "high"},
+          {"label": "Medium", "value": "medium"},
+          {"label": "Low", "value": "low"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_asset_priority"
+      }
+    },
+    "input_automatable": {
+      "type": "input.dropdown",
+      "title": "Automatable",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Yes", "value": "yes"},
+          {"label": "No", "value": "no"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_automatable"
+      }
+    },
+    "input_tech_impact": {
+      "type": "input.dropdown",
+      "title": "Technical Impact",
+      "options": {
+        "items": [
+          {"label": "All", "value": "*"},
+          {"label": "Total", "value": "total"},
+          {"label": "Partial", "value": "partial"}
+        ],
+        "defaultValue": "*",
+        "token": "sel_tech_impact"
+      }
+    }
+  },
+  "defaults": {
+    "dataSources": {"ds.search": {"options": {"queryParameters": {"earliest": "-24h", "latest": "now"}}}},
+    "tokens": {
+      "default": {
+        "sel_priority": {"value": "P1"},
+        "sel_sla": {"value": "*"},
+        "sel_edr": {"value": "*"},
+        "sel_kev": {"value": "*"},
+        "sel_exposed": {"value": "*"},
+        "sel_asset_priority": {"value": "*"},
+        "sel_automatable": {"value": "*"},
+        "sel_tech_impact": {"value": "*"}
+      }
+    }
+  },
+  "dataSources": {
+    "ds_kpi_findings": {
+      "type": "ds.search",
+      "name": "Total open findings",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | stats count"}
+    },
+    "ds_kpi_p1": {
+      "type": "ds.search",
+      "name": "P1 findings",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where priority_label=\"P1\" | stats count"}
+    },
+    "ds_kpi_p1_overdue": {
+      "type": "ds.search",
+      "name": "P1 overdue",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where priority_label=\"P1\" AND sla_status=\"overdue\" | stats count"}
+    },
+    "ds_kpi_forensic": {
+      "type": "ds.search",
+      "name": "Forensic hosts",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where forensic_required=\"yes\" | stats dc(Host) as count"}
+    },
+    "ds_tier_p1": {
+      "type": "ds.search",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where priority_label=\"P1\" | stats count"}
+    },
+    "ds_tier_p2": {
+      "type": "ds.search",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where priority_label=\"P2\" | stats count"}
+    },
+    "ds_tier_p3": {
+      "type": "ds.search",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where priority_label=\"P3\" | stats count"}
+    },
+    "ds_tier_p4": {
+      "type": "ds.search",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | where priority_label=\"P4\" | stats count"}
+    },
+    "ds_severity": {
+      "type": "ds.search",
+      "name": "CVSS-only contrast",
+      "options": {"query": "| inputlookup asset_vulnerability_data.csv | search \"Vulnerability State\"!=\"Fixed\" | stats count as Findings by Risk | eval order=case(Risk=\"Critical\",1,Risk=\"High\",2,Risk=\"Medium\",3,true(),4) | sort order | fields - order | rename Risk as Severity"}
+    },
+    "ds_sla_pie": {
+      "type": "ds.search",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\" | stats count by sla_status"}
+    },
+    "ds_worklist": {
+      "type": "ds.search",
+      "name": "Prioritized worklist",
+      "options": {"query": "| savedsearch \"BOD 26-04 Vulnerability Prioritization\"\n| where (\"$sel_priority$\"=\"*\" OR priority_label=\"$sel_priority$\") AND (\"$sel_sla$\"=\"*\" OR sla_status=\"$sel_sla$\") AND (\"$sel_edr$\"=\"*\" OR edr_installed=\"$sel_edr$\") AND (\"$sel_kev$\"=\"*\" OR in_kev=\"$sel_kev$\") AND (\"$sel_exposed$\"=\"*\" OR exposed=\"$sel_exposed$\") AND (\"$sel_asset_priority$\"=\"*\" OR asset_priority=\"$sel_asset_priority$\") AND (\"$sel_automatable$\"=\"*\" OR automatable=\"$sel_automatable$\") AND (\"$sel_tech_impact$\"=\"*\" OR technical_impact=\"$sel_tech_impact$\")\n| table priority_label forensic_required Host cve cvss in_kev exploitation automatable technical_impact exposed elevated asset_priority bunit owner due_date sla_status edr_installed\n| rename priority_label as Priority, forensic_required as Forensic, cve as CVE, cvss as CVSS, in_kev as \"In KEV\", exploitation as Exploitation, automatable as Automatable, technical_impact as \"Tech Impact\", exposed as Exposed, elevated as Elevated, asset_priority as \"Asset Priority\", bunit as \"Business Unit\", owner as Owner, due_date as \"Due Date\", sla_status as \"SLA Status\", edr_installed as EDR"}
+    },
+    "ds_ea_total": {
+      "type": "ds.search",
+      "name": "EA observed assets",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | stats count"}
+    },
+    "ds_ea_shadow_kpi": {
+      "type": "ds.search",
+      "name": "Shadow assets (no CMDB source)",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | where asset_type IN (\"Server\",\"Workstation\") | where isnull(lastseen_14) AND isnull(lastseen_15) | stats count"}
+    },
+    "ds_ea_unscanned_kpi": {
+      "type": "ds.search",
+      "name": "Servers without current VA scan",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | where asset_type=\"Server\" | where isnull(lastseen_12) OR lastseen_12<(now()-86400*5) | stats count"}
+    },
+    "ds_ea_noedr_kpi": {
+      "type": "ds.search",
+      "name": "No endpoint security",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | where asset_type IN (\"Server\",\"Workstation\") AND isnull(lastseen_05) | stats count"}
+    },
+    "ds_ea_shadow_table": {
+      "type": "ds.search",
+      "name": "Shadow asset list",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | where asset_type IN (\"Server\",\"Workstation\") | where isnull(lastseen_14) AND isnull(lastseen_15) | eval last_seen=strftime(lastseen_max,\"%Y-%m-%d\"), first_seen=strftime(firstseen,\"%Y-%m-%d\"), scanned=if(isnotnull(lastseen_12),\"yes\",\"no\"), edr=if(isnotnull(lastseen_05),\"yes\",\"no\") | table nt_host asset_type os ip bunit priority first_seen last_seen scanned edr | sort - last_seen | rename nt_host as Host, asset_type as Type, os as OS, ip as IP, bunit as \"Business Unit\", priority as Priority, first_seen as \"First Seen\", last_seen as \"Last Seen\", scanned as \"VA Scanned\", edr as EDR"}
+    },
+    "ds_ea_unscanned_table": {
+      "type": "ds.search",
+      "name": "Unscanned / stale servers",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | where asset_type=\"Server\" | where isnull(lastseen_12) OR lastseen_12<(now()-86400*5) | eval scan_status=if(isnull(lastseen_12),\"never_scanned\",\"stale_coverage\"), last_scan=if(isnull(lastseen_12),\"-\",strftime(lastseen_12,\"%Y-%m-%d\")), cmdb=if(isnotnull(lastseen_14) OR isnotnull(lastseen_15),\"yes\",\"no\"), edr=if(isnotnull(lastseen_05),\"yes\",\"no\") | table nt_host os ip bunit priority scan_status last_scan cmdb edr | sort scan_status | rename nt_host as Host, os as OS, ip as IP, bunit as \"Business Unit\", priority as Priority, scan_status as \"Scan Status\", last_scan as \"Last Scan\", cmdb as \"In CMDB\", edr as EDR"}
+    },
+    "ds_ea_by_type": {
+      "type": "ds.search",
+      "name": "Total discovered assets by type",
+      "options": {"query": "| inputlookup ea_network_asset_inventory | stats count by asset_type | sort - count"}
+    },
+    "ds_ea_sources": {
+      "type": "ds.search",
+      "name": "Telemetry data sources contributing to EA",
+      "options": {"query": "| inputlookup ea_network_asset_inventory\n| eval s05=if(isnotnull(lastseen_05),1,0), s12=if(isnotnull(lastseen_12),1,0), s14=if(isnotnull(lastseen_14),1,0), s15=if(isnotnull(lastseen_15),1,0), s17=if(isnotnull(lastseen_17),1,0), s19=if(isnotnull(lastseen_19),1,0)\n| stats sum(s05) as s05, sum(s12) as s12, sum(s14) as s14, sum(s15) as s15, sum(s17) as s17, sum(s19) as s19\n| transpose\n| rename column as src, \"row 1\" as assets_observed\n| eval \"Source ID\"=case(src=\"s05\",\"05\",src=\"s12\",\"12\",src=\"s14\",\"14\",src=\"s15\",\"15\",src=\"s17\",\"17\",src=\"s19\",\"19\",true(),src)\n| eval \"Source Name\"=case(src=\"s05\",\"CrowdStrike Falcon EDR\",src=\"s12\",\"Tenable.io Scanner\",src=\"s14\",\"ServiceNow CMDB (Primary)\",src=\"s15\",\"ServiceNow CMDB (Secondary)\",src=\"s17\",\"AWS EC2\",src=\"s19\",\"Active Directory\",true(),\"Unknown\")\n| eval \"Type\"=case(src=\"s05\",\"EDR\",src=\"s12\",\"VA Scanner\",src=\"s14\",\"CMDB\",src=\"s15\",\"CMDB\",src=\"s17\",\"Cloud\",src=\"s19\",\"Identity\",true(),\"Other\")\n| eval \"Assets Observed\"=tonumber(assets_observed)\n| table \"Source ID\" \"Source Name\" \"Type\" \"Assets Observed\"\n| sort \"Source ID\""}
+    }
+  },
+  "visualizations": {
+    "eyebrow": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "MYTHOS ERA - RISK-BASED VULNERABILITY MANAGEMENT | CISA BOD 26-04 x SPLUNK EXPOSURE ANALYTICS", "fontColor": "#39C6D6", "backgroundColor": "#0D1524", "fontSize": "small"}
+    },
+    "main_title": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "# Vulnerability Risk - Prioritize the Known, Expose the Unknown", "fontColor": "#E7ECF5", "backgroundColor": "#0D1524", "fontSize": "large"}
+    },
+    "main_sub": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "Part 1 prioritizes known findings with **Public Exposure (ASM) x KEV x Automatable x Technical Impact** (CISA-published data). Part 2 uses **Exposure Analytics** to quantify what the funnel does NOT govern: shadow assets, unscanned servers, missing EDR.", "fontColor": "#8B98AC", "backgroundColor": "#0D1524", "fontSize": "default"}
+    },
+    "part1_banner": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "## PART 1 - BOD 26-04 Patch Prioritization (scanned servers)", "fontColor": "#0A0F1A", "backgroundColor": "#39C6D6", "fontSize": "default"}
+    },
+    "kpi_findings": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_kpi_findings"},
+      "title": "Open findings",
+      "options": {"majorColor": "#8B98AC", "backgroundColor": "#0D1420", "unit": "findings", "unitPosition": "after", "underLabel": "Active, non-remediated", "showSparkline": false, "showTrend": false}
+    },
+    "kpi_p1": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_kpi_p1"},
+      "title": "P1 - Fix within 3 days",
+      "options": {"majorColor": "#FF4D5E", "backgroundColor": "#0D1420", "unit": "findings", "unitPosition": "after", "underLabel": "Exposed + actively exploited", "showSparkline": false, "showTrend": false}
+    },
+    "kpi_p1_overdue": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_kpi_p1_overdue"},
+      "title": "P1 OVERDUE",
+      "options": {"majorColor": "#FF4D5E", "backgroundColor": "#1A0D12", "unit": "findings", "unitPosition": "after", "underLabel": "Past 3-day SLA", "showSparkline": false, "showTrend": false}
+    },
+    "kpi_forensic": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_kpi_forensic"},
+      "title": "Total impacted hosts in P1",
+      "options": {"majorColor": "#FFA23E", "backgroundColor": "#0D1420", "unit": "hosts", "unitPosition": "after", "underLabel": "Each requires forensic triage (assume compromise)", "showSparkline": false, "showTrend": false}
+    },
+    "tier_p1": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_tier_p1"},
+      "title": "P1 - Urgent",
+      "options": {"majorColor": "#FF4D5E", "backgroundColor": "#0D1420", "unit": "findings", "unitPosition": "after", "underLabel": "3 days + forensic triage", "showSparkline": false, "showTrend": false}
+    },
+    "tier_p2": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_tier_p2"},
+      "title": "P2 - High",
+      "options": {"majorColor": "#FFA23E", "backgroundColor": "#0D1420", "unit": "findings", "unitPosition": "after", "underLabel": "Within 14 days", "showSparkline": false, "showTrend": false}
+    },
+    "tier_p3": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_tier_p3"},
+      "title": "P3 - Medium",
+      "options": {"majorColor": "#FFD666", "backgroundColor": "#0D1420", "unit": "findings", "unitPosition": "after", "underLabel": "Within 60 days", "showSparkline": false, "showTrend": false}
+    },
+    "tier_p4": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_tier_p4"},
+      "title": "P4 - Planned",
+      "options": {"majorColor": "#94A3BC", "backgroundColor": "#0D1420", "unit": "findings", "unitPosition": "after", "underLabel": "At next system upgrade", "showSparkline": false, "showTrend": false}
+    },
+    "severity_table": {
+      "type": "splunk.table",
+      "dataSources": {"primary": "ds_severity"},
+      "title": "The old way - CVSS severity alone",
+      "options": {
+        "backgroundColor": "#0D1420", "count": 5, "drilldown": "none", "showRowNumbers": false,
+        "columnFormat": {
+          "Severity": {"rowColors": "> table | seriesByName(\"Severity\") | matchValue(sevColor)"},
+          "Findings": {"align": "right", "rowColors": "> table | seriesByName(\"Severity\") | matchValue(sevColor)"}
+        }
+      },
+      "context": {
+        "sevColor": [
+          {"match": "Critical", "value": "#FF4D5E"},
+          {"match": "High", "value": "#FFA23E"},
+          {"match": "Medium", "value": "#FFD666"},
+          {"match": "Low", "value": "#5B8DEF"}
+        ]
+      }
+    },
+    "sla_pie": {
+      "type": "splunk.pie",
+      "dataSources": {"primary": "ds_sla_pie"},
+      "title": "SLA posture - are we on time?",
+      "options": {"backgroundColor": "#0D1420"}
+    },
+    "worklist_title": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "### Prioritized worklist - tier: $sel_priority$ | SLA: $sel_sla$ | EDR: $sel_edr$ - sorted P1-first, earliest deadline on top.", "fontColor": "#39C6D6", "backgroundColor": "#101827"}
+    },
+    "worklist": {
+      "type": "splunk.table",
+      "dataSources": {"primary": "ds_worklist"},
+      "options": {
+        "backgroundColor": "#0D1420", "count": 20, "drilldown": "none", "showRowNumbers": false,
+        "columnFormat": {
+          "Priority": {
+            "rowBackgroundColors": "> table | seriesByName(\"Priority\") | matchValue(pColor)",
+            "rowColors": "> table | seriesByName(\"Priority\") | pick(whiteText)"
+          },
+          "SLA Status": {"rowColors": "> table | seriesByName(\"SLA Status\") | matchValue(slaColor)"},
+          "In KEV": {"rowColors": "> table | seriesByName(\"In KEV\") | matchValue(ynColor)"},
+          "Exposed": {"rowColors": "> table | seriesByName(\"Exposed\") | matchValue(ynColor)"},
+          "Automatable": {"rowColors": "> table | seriesByName(\"Automatable\") | matchValue(ynColor)"},
+          "Forensic": {"rowColors": "> table | seriesByName(\"Forensic\") | matchValue(ynColor)"},
+          "Elevated": {"rowColors": "> table | seriesByName(\"Elevated\") | matchValue(elevColor)"},
+          "EDR": {"rowColors": "> table | seriesByName(\"EDR\") | matchValue(edrColor)"}
+        }
+      },
+      "context": {
+        "pColor": [
+          {"match": "P1", "value": "#FF4D5E"},
+          {"match": "P2", "value": "#FFA23E"},
+          {"match": "P3", "value": "#FFD666"},
+          {"match": "P4", "value": "#5B8DEF"}
+        ],
+        "whiteText": ["#FFFFFF"],
+        "slaColor": [
+          {"match": "overdue", "value": "#FF4D5E"},
+          {"match": "within_sla", "value": "#2ECC8F"},
+          {"match": "next_system_upgrade", "value": "#94A3BC"}
+        ],
+        "ynColor": [
+          {"match": "yes", "value": "#FF4D5E"},
+          {"match": "no", "value": "#6F7D92"}
+        ],
+        "elevColor": [
+          {"match": "yes", "value": "#39C6D6"},
+          {"match": "no", "value": "#6F7D92"}
+        ],
+        "edrColor": [
+          {"match": "no", "value": "#FF4D5E"},
+          {"match": "yes", "value": "#2ECC8F"}
+        ]
+      }
+    },
+    "part2_banner": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "## PART 2 - Exposure Analytics: what the funnel does NOT govern", "fontColor": "#0A0F1A", "backgroundColor": "#FF4D5E", "fontSize": "default"}
+    },
+    "kpi_ea_total": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_ea_total"},
+      "title": "EA observed assets",
+      "options": {"majorColor": "#39C6D6", "backgroundColor": "#0D1420", "unit": "assets", "unitPosition": "after", "underLabel": "Resolved from 20+ telemetry sources", "showSparkline": false, "showTrend": false}
+    },
+    "kpi_ea_shadow": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_ea_shadow_kpi"},
+      "title": "Shadow assets",
+      "options": {"majorColor": "#FF4D5E", "backgroundColor": "#1A0D12", "unit": "assets", "unitPosition": "after", "underLabel": "Observed on network, absent from CMDB", "showSparkline": false, "showTrend": false}
+    },
+    "kpi_ea_unscanned": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_ea_unscanned_kpi"},
+      "title": "Servers without current VA scan",
+      "options": {"majorColor": "#FFA23E", "backgroundColor": "#0D1420", "unit": "servers", "unitPosition": "after", "underLabel": "Never scanned or coverage stale >5d", "showSparkline": false, "showTrend": false}
+    },
+    "kpi_ea_noedr": {
+      "type": "splunk.singlevalue",
+      "dataSources": {"primary": "ds_ea_noedr_kpi"},
+      "title": "No endpoint security",
+      "options": {"majorColor": "#FFD666", "backgroundColor": "#0D1420", "unit": "assets", "unitPosition": "after", "underLabel": "Servers + workstations without EDR agent", "showSparkline": false, "showTrend": false}
+    },
+    "shadow_table": {
+      "type": "splunk.table",
+      "dataSources": {"primary": "ds_ea_shadow_table"},
+      "title": "2.1 Shadow assets - alive on the network, nobody registered them",
+      "description": "Remediation = register + scan, not patch.",
+      "options": {
+        "backgroundColor": "#0D1420", "count": 12, "drilldown": "none", "showRowNumbers": false,
+        "columnFormat": {
+          "VA Scanned": {"rowColors": "> table | seriesByName(\"VA Scanned\") | matchValue(noRed)"},
+          "EDR": {"rowColors": "> table | seriesByName(\"EDR\") | matchValue(noRed)"}
+        }
+      },
+      "context": {
+        "noRed": [
+          {"match": "no", "value": "#FF4D5E"},
+          {"match": "yes", "value": "#2ECC8F"}
+        ]
+      }
+    },
+    "unscanned_table": {
+      "type": "splunk.table",
+      "dataSources": {"primary": "ds_ea_unscanned_table"},
+      "title": "2.2 Servers outside VA coverage - risk unmeasured",
+      "description": "These contribute zero findings to Part 1. Absence of findings is not absence of risk.",
+      "options": {
+        "backgroundColor": "#0D1420", "count": 12, "drilldown": "none", "showRowNumbers": false,
+        "columnFormat": {
+          "Scan Status": {"rowColors": "> table | seriesByName(\"Scan Status\") | matchValue(scanColor)"},
+          "In CMDB": {"rowColors": "> table | seriesByName(\"In CMDB\") | matchValue(noRed)"},
+          "EDR": {"rowColors": "> table | seriesByName(\"EDR\") | matchValue(noRed)"}
+        }
+      },
+      "context": {
+        "scanColor": [
+          {"match": "never_scanned", "value": "#FF4D5E"},
+          {"match": "stale_coverage", "value": "#FFA23E"}
+        ],
+        "noRed": [
+          {"match": "no", "value": "#FF4D5E"},
+          {"match": "yes", "value": "#2ECC8F"}
+        ]
+      }
+    },
+    "assets_by_type_chart": {
+      "type": "splunk.pie",
+      "dataSources": {"primary": "ds_ea_by_type"},
+      "title": "2.3 Total discovered assets by type",
+      "description": "Everything EA has resolved from telemetry - the denominator of the whole story.",
+      "options": {"backgroundColor": "#0D1420"}
+    },
+    "telemetry_sources_table": {
+      "type": "splunk.table",
+      "dataSources": {"primary": "ds_ea_sources"},
+      "title": "2.4 Telemetry data sources feeding EA",
+      "description": "Each row = one integrated data source. Assets Observed = distinct assets EA has seen from that source.",
+      "options": {
+        "backgroundColor": "#0D1420", "count": 10, "drilldown": "none", "showRowNumbers": false,
+        "columnFormat": {
+          "Type": {"rowColors": "> table | seriesByName(\"Type\") | matchValue(typeColor)"},
+          "Assets Observed": {"align": "right"}
+        }
+      },
+      "context": {
+        "typeColor": [
+          {"match": "EDR", "value": "#2ECC8F"},
+          {"match": "VA Scanner", "value": "#39C6D6"},
+          {"match": "CMDB", "value": "#5B8DEF"},
+          {"match": "Cloud", "value": "#FFA23E"},
+          {"match": "Identity", "value": "#FFD666"}
+        ]
+      }
+    },
+    "footer": {
+      "type": "splunk.markdown",
+      "options": {"markdown": "Sources: Tenable findings (generated on real EA servers) x ea_network_asset_inventory (live) x asm_exposed_assets (ASM) x CISA KEV x CISA Vulnrichment SSVC (index=vuln_intel) | SLA model: CISA BOD 26-04", "fontColor": "#8B98AC", "backgroundColor": "#0A0F1A", "fontSize": "small"}
+    }
+  },
+  "layout": {
+    "type": "absolute",
+    "globalInputs": ["input_priority", "input_sla", "input_edr", "input_kev", "input_exposed", "input_asset_priority", "input_automatable", "input_tech_impact"],
+    "options": {"width": 1440, "height": 2200, "backgroundColor": "#0A0F1A", "display": "fit-to-width"},
+    "structure": [
+      {"item": "eyebrow", "type": "block", "position": {"x": 10, "y": 5, "w": 1420, "h": 22}},
+      {"item": "main_title", "type": "block", "position": {"x": 10, "y": 27, "w": 1420, "h": 40}},
+      {"item": "main_sub", "type": "block", "position": {"x": 10, "y": 67, "w": 1420, "h": 42}},
+      {"item": "part1_banner", "type": "block", "position": {"x": 10, "y": 117, "w": 1420, "h": 34}},
+      {"item": "kpi_findings", "type": "block", "position": {"x": 10, "y": 158, "w": 350, "h": 110}},
+      {"item": "kpi_p1", "type": "block", "position": {"x": 370, "y": 158, "w": 350, "h": 110}},
+      {"item": "kpi_p1_overdue", "type": "block", "position": {"x": 730, "y": 158, "w": 350, "h": 110}},
+      {"item": "kpi_forensic", "type": "block", "position": {"x": 1090, "y": 158, "w": 340, "h": 110}},
+      {"item": "tier_p1", "type": "block", "position": {"x": 10, "y": 278, "w": 350, "h": 115}},
+      {"item": "tier_p2", "type": "block", "position": {"x": 370, "y": 278, "w": 350, "h": 115}},
+      {"item": "tier_p3", "type": "block", "position": {"x": 730, "y": 278, "w": 350, "h": 115}},
+      {"item": "tier_p4", "type": "block", "position": {"x": 1090, "y": 278, "w": 340, "h": 115}},
+      {"item": "severity_table", "type": "block", "position": {"x": 10, "y": 403, "w": 705, "h": 250}},
+      {"item": "sla_pie", "type": "block", "position": {"x": 725, "y": 403, "w": 705, "h": 250}},
+      {"item": "worklist_title", "type": "block", "position": {"x": 10, "y": 663, "w": 1420, "h": 32}},
+      {"item": "worklist", "type": "block", "position": {"x": 10, "y": 700, "w": 1420, "h": 620}},
+      {"item": "part2_banner", "type": "block", "position": {"x": 10, "y": 1335, "w": 1420, "h": 34}},
+      {"item": "kpi_ea_total", "type": "block", "position": {"x": 10, "y": 1376, "w": 350, "h": 110}},
+      {"item": "kpi_ea_shadow", "type": "block", "position": {"x": 370, "y": 1376, "w": 350, "h": 110}},
+      {"item": "kpi_ea_unscanned", "type": "block", "position": {"x": 730, "y": 1376, "w": 350, "h": 110}},
+      {"item": "kpi_ea_noedr", "type": "block", "position": {"x": 1090, "y": 1376, "w": 340, "h": 110}},
+      {"item": "shadow_table", "type": "block", "position": {"x": 10, "y": 1496, "w": 705, "h": 330}},
+      {"item": "unscanned_table", "type": "block", "position": {"x": 725, "y": 1496, "w": 705, "h": 330}},
+      {"item": "assets_by_type_chart", "type": "block", "position": {"x": 10, "y": 1836, "w": 705, "h": 310}},
+      {"item": "telemetry_sources_table", "type": "block", "position": {"x": 725, "y": 1836, "w": 705, "h": 310}},
+      {"item": "footer", "type": "block", "position": {"x": 10, "y": 2156, "w": 1420, "h": 30}}
+    ]
+  }
+}
