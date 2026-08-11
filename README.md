@@ -226,48 +226,52 @@ In Splunk ES, create a saved search named **"BOD 26-04 Vulnerability Prioritizat
 **How the search works:**
 
 ```spl
--- Start: Tenable findings (exclude fixed)
 | inputlookup asset_vulnerability_data.csv
 | search "Vulnerability State"!="Fixed"
+| eval cve=upper(CVE)
 
--- Enrich: CISA KEV - is this CVE actively exploited?
-| lookup cisa_kev_lookup.csv cveID AS cve OUTPUT dateAdded AS kev_date_added
+``` ② KEV — CISA catalog ```
+| lookup cisa_kev_lookup.csv cveID AS cve OUTPUT dateAdded AS kev_date_added dueDate AS kev_due_date vulnerabilityName AS kev_name
 | eval in_kev=if(isnotnull(kev_date_added),"yes","no")
 
--- Enrich: CISA Vulnrichment - SSVC decision points
+``` ③④ SSVC — CISA Vulnrichment via vuln_intel pipeline ```
 | lookup cisa_vulnrichment_lookup.csv cve OUTPUT exploitation automatable technical_impact
 
--- Enrich: EA asset context - CMDB registration and EDR presence
-| lookup ea_network_asset_inventory nt_host AS Host
-    OUTPUT priority AS asset_priority lastseen_14 lastseen_15 lastseen_05
+``` asset context — EA unified inventory (live) ```
+| lookup ea_network_asset_inventory nt_host AS Host OUTPUT bunit priority AS asset_priority user_id AS owner os AS ea_os environment lastseen_14 lastseen_15 lastseen_05
+
+``` ① public exposure — ASM feed ```
+| lookup asm_exposed_assets.csv nt_host AS Host OUTPUT external_ip service AS exposed_service asm_source
+| eval exposed=if(isnotnull(asm_source),"yes","no")
+
+``` EA-derived context flags ```
 | eval cmdb_registered=if(isnotnull(lastseen_14) OR isnotnull(lastseen_15),"yes","no")
 | eval edr_installed=if(isnotnull(lastseen_05),"yes","no")
 
--- Enrich: ASM exposure - is this host reachable from the internet?
-| lookup asm_exposed_assets.csv nt_host AS Host OUTPUT asm_source
-| eval exposed=if(isnotnull(asm_source),"yes","no")
-
--- BOD 26-04: four-variable prioritization decision
+``` BOD 26-04 decision ```
+| eval cvss=tonumber('CVSS v3.0 Base Score')
 | eval base_tier=case(
-    exposed="yes" AND in_kev="yes",                       1,
-    exposed="yes" AND (automatable="yes" OR cvss>=9.0),   2,
-    exposed="no"  AND in_kev="yes" AND automatable="yes", 2,
-    exposed="no"  AND in_kev="yes",                       3,
-    exposed="yes",                                        3,
-    true(),                                               4)
-
--- Business elevation: critical assets move up one tier
+    exposed="yes" AND in_kev="yes", 1,
+    exposed="yes" AND (automatable="yes" OR cvss>=9.0), 2,
+    exposed="no" AND in_kev="yes" AND automatable="yes", 2,
+    exposed="no" AND in_kev="yes", 3,
+    exposed="yes", 3,
+    true(), 4)
 | eval priority_tier=if(asset_priority="critical" AND base_tier>1, base_tier-1, base_tier)
+| eval elevated=if(priority_tier!=base_tier,"yes","no")
 
--- SLA clock: 3 / 14 / 60 days per tier
+``` SLA clock ```
 | eval sla_days=case(priority_tier=1,3, priority_tier=2,14, priority_tier=3,60, true(),null())
-| eval due_at=first_epoch + sla_days*86400
-| eval sla_status=case(isnull(due_at),"next_system_upgrade",
-                        now()>due_at,"overdue",
-                        true(),"within_sla")
-
--- P1 forensic flag: patching alone is not enough - assume compromise
+| eval first_epoch=strptime('First Discovered',"%Y-%m-%d")
+| eval due_at=if(isnotnull(sla_days), first_epoch+sla_days*86400, null())
+| eval due_date=strftime(due_at,"%Y-%m-%d")
+| eval sla_status=case(isnull(due_at),"next_system_upgrade", now()>due_at,"overdue", true(),"within_sla")
 | eval forensic_required=if(priority_tier=1,"yes","no")
+| eval priority_label="P".priority_tier
+
+| table priority_label forensic_required Host cve kev_name cvss in_kev exploitation automatable technical_impact exposed exposed_service elevated asset_priority bunit owner cmdb_registered edr_installed ea_os "First Discovered" due_date sla_status
+| sort priority_label due_date
+
 ```
 
 The four BOD 26-04 tiers:
