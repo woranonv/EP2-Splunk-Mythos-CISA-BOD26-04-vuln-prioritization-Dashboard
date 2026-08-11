@@ -272,18 +272,22 @@ In Splunk ES, create a saved search named **"BOD 26-04 Vulnerability Prioritizat
 | table priority_label forensic_required Host cve kev_name cvss in_kev exploitation automatable technical_impact exposed exposed_service elevated asset_priority bunit owner cmdb_registered edr_installed ea_os "First Discovered" due_date sla_status
 | sort priority_label due_date
 
+
 ```
 
 The four BOD 26-04 tiers:
 
-| Tier | Condition | SLA | Notes |
-|---|---|---|---|
-| **P1 - Urgent** | Internet-exposed + in CISA KEV | 3 days + forensic triage | Assume compromise - patch AND investigate |
-| **P2 - High** | Internet-exposed + automatable exploit, OR internal + KEV + automatable | 14 days | |
-| **P3 - Medium** | Internal + KEV only, OR exposed but low automation/impact | 60 days | |
-| **P4 - Planned** | No active exploitation signal, not internet-exposed | Next system upgrade | |
+![BOD-Tier](images/BOD_26_04_tiers.png)
 
-> Critical assets (tagged in EA) are automatically elevated one tier. A P2 finding on a critical asset becomes P1.
+> Business Elevation: Critical assets (tagged in EA) are automatically elevated one tier — a P2 finding on a critical asset becomes P1. Elevated findings are flagged in the dashboard Elevated column.
+
+> Forensic Triage: Required only when Priority Tier = P1 AND Technical Impact = Total. Forensic triage means assume compromise — patch AND investigate simultaneously.
+
+
+Remediation Timelines Flow from BOD26-04
+
+![BOD-Timeline](images/BOD_26-04_Remediation_Timelines.png)
+
 
 Output
 
