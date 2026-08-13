@@ -229,49 +229,77 @@ In Splunk ES, create a saved search named **"BOD 26-04 Vulnerability Prioritizat
 | inputlookup asset_vulnerability_data.csv
 | search "Vulnerability State"!="Fixed"
 | eval cve=upper(CVE)
-
-``` ② KEV — CISA catalog ```
+ 
+``` KEV - CISA catalog ```
 | lookup cisa_kev_lookup.csv cveID AS cve OUTPUT dateAdded AS kev_date_added dueDate AS kev_due_date vulnerabilityName AS kev_name
 | eval in_kev=if(isnotnull(kev_date_added),"yes","no")
-
-``` ③④ SSVC — CISA Vulnrichment via vuln_intel pipeline ```
+ 
+``` SSVC - CISA Vulnrichment ```
 | lookup cisa_vulnrichment_lookup.csv cve OUTPUT exploitation automatable technical_impact
-
-``` asset context — EA unified inventory (live) ```
+ 
+``` Asset context - EA unified inventory ```
 | lookup ea_network_asset_inventory nt_host AS Host OUTPUT bunit priority AS asset_priority user_id AS owner os AS ea_os environment lastseen_14 lastseen_15 lastseen_05
-
-``` ① public exposure — ASM feed ```
+ 
+``` Public exposure - ASM feed ```
 | lookup asm_exposed_assets.csv nt_host AS Host OUTPUT external_ip service AS exposed_service asm_source
 | eval exposed=if(isnotnull(asm_source),"yes","no")
-
+ 
 ``` EA-derived context flags ```
 | eval cmdb_registered=if(isnotnull(lastseen_14) OR isnotnull(lastseen_15),"yes","no")
 | eval edr_installed=if(isnotnull(lastseen_05),"yes","no")
-
-``` BOD 26-04 decision ```
 | eval cvss=tonumber('CVSS v3.0 Base Score')
+ 
+``` Normalize SSVC values with CVSS fallback when Vulnrichment data is missing ```
+| eval ti=case(
+    technical_impact="total",   "total",
+    technical_impact="partial", "partial",
+    cvss>=9.0,                  "total",
+    true(),                     "partial")
+| eval auto=case(
+    automatable="yes", "yes",
+    automatable="no",  "no",
+    cvss>=7.0,         "yes",
+    true(),            "no")
+ 
+``` BOD 26-04: full 4-variable CISA decision tree (all 16 paths) ```
 | eval base_tier=case(
-    exposed="yes" AND in_kev="yes", 1,
-    exposed="yes" AND (automatable="yes" OR cvss>=9.0), 2,
-    exposed="no" AND in_kev="yes" AND automatable="yes", 2,
-    exposed="no" AND in_kev="yes", 3,
-    exposed="yes", 3,
+    exposed="yes" AND in_kev="yes" AND auto="yes" AND ti="total",    1,
+    exposed="yes" AND in_kev="yes" AND auto="yes" AND ti="partial",  1,
+    exposed="yes" AND in_kev="yes" AND auto="no"  AND ti="total",    1,
+    exposed="yes" AND in_kev="yes" AND auto="no"  AND ti="partial",  2,
+    exposed="yes" AND in_kev="no"  AND auto="yes" AND ti="total",    1,
+    exposed="yes" AND in_kev="no"  AND auto="yes" AND ti="partial",  2,
+    exposed="yes" AND in_kev="no"  AND auto="no"  AND ti="total",    2,
+    exposed="yes" AND in_kev="no"  AND auto="no"  AND ti="partial",  3,
+    exposed="no"  AND in_kev="yes" AND auto="yes" AND ti="total",    1,
+    exposed="no"  AND in_kev="yes" AND auto="yes" AND ti="partial",  2,
+    exposed="no"  AND in_kev="yes" AND auto="no"  AND ti="total",    2,
+    exposed="no"  AND in_kev="yes" AND auto="no"  AND ti="partial",  2,
+    exposed="no"  AND in_kev="no"  AND auto="yes" AND ti="total",    3,
+    exposed="no"  AND in_kev="no"  AND auto="yes" AND ti="partial",  3,
     true(), 4)
+ 
+``` Business elevation: critical assets move up one tier (business rule - not part of CISA BOD 26-04) ```
+``` DISABLED - remove this comment block to re-enable business elevation:
 | eval priority_tier=if(asset_priority="critical" AND base_tier>1, base_tier-1, base_tier)
 | eval elevated=if(priority_tier!=base_tier,"yes","no")
-
+```
+| eval priority_tier=base_tier
+| eval elevated="no"
+ 
 ``` SLA clock ```
 | eval sla_days=case(priority_tier=1,3, priority_tier=2,14, priority_tier=3,60, true(),null())
 | eval first_epoch=strptime('First Discovered',"%Y-%m-%d")
 | eval due_at=if(isnotnull(sla_days), first_epoch+sla_days*86400, null())
 | eval due_date=strftime(due_at,"%Y-%m-%d")
 | eval sla_status=case(isnull(due_at),"next_system_upgrade", now()>due_at,"overdue", true(),"within_sla")
-| eval forensic_required=if(priority_tier=1,"yes","no")
+ 
+``` Forensic triage: P1 with Total technical impact only (per CISA BOD 26-04) ```
+| eval forensic_required=if(priority_tier=1 AND ti="total","yes","no")
 | eval priority_label="P".priority_tier
-
+ 
 | table priority_label forensic_required Host cve kev_name cvss in_kev exploitation automatable technical_impact exposed exposed_service elevated asset_priority bunit owner cmdb_registered edr_installed ea_os "First Discovered" due_date sla_status
 | sort priority_label due_date
-
 
 ```
 
