@@ -100,6 +100,8 @@ Connect your data sources in the EA configuration UI (CMDB, EDR, cloud, identity
 
 ![EA-Source](images/EA-add-source.png)
 
+-- Verify SPL
+
 ```spl
 | inputlookup ea_network_asset_inventory | stats count by asset_type
 | inputlookup ea_network_asset_inventory
@@ -128,7 +130,7 @@ In this Demo, we have asset vulnerability from Tenable as `asset_vulnerability_d
 
 Set lookup permissions: **All apps / Everyone read**.
 
-Verify with SPL
+--- Verify with SPL
 
 ```spl
 | inputlookup asset_vulnerability_data.csv 
@@ -146,9 +148,9 @@ In this Demo, we have the asm data  as `asm_exposed_assets.csv` with columns: `n
 
 Set lookup permissions: **All apps / Everyone read**.
 
-```spl
 -- Verify SPL
 
+```spl
 | inputlookup asm_exposed_assets.csv
 ```
 ![asm_data](images/asm_data.png)
@@ -169,9 +171,9 @@ In this demo, we just manually download it as below;
 
 Key columns used by the saved search: `cveID`, `dateAdded`, `dueDate`, `vulnerabilityName`
 
-```spl
 -- Verify SPL
 
+```spl
 | inputlookup cisa_kev_lookup.csv
 ```
 ![kev_data](images/kev_data.png)
@@ -282,8 +284,8 @@ In Splunk ES, create a saved search named **"BOD 26-04 Vulnerability Prioritizat
 ``` Business elevation: critical assets move up one tier (business rule - not part of CISA BOD 26-04) ```
 ``` DISABLED - remove this comment block to re-enable business elevation:
 | eval priority_tier=if(asset_priority="critical" AND base_tier>1, base_tier-1, base_tier)
-| eval elevated=if(priority_tier!=base_tier,"yes","no")
-```
+| eval elevated=if(priority_tier!=base_tier,"yes","no") ```
+
 | eval priority_tier=base_tier
 | eval elevated="no"
  
@@ -303,7 +305,7 @@ In Splunk ES, create a saved search named **"BOD 26-04 Vulnerability Prioritizat
 
 ```
 
-The four BOD 26-04 tiers:
+### The four BOD 26-04 tiers:
 
 ![BOD-Tier](images/BOD_26_04_tiers.png)
 
