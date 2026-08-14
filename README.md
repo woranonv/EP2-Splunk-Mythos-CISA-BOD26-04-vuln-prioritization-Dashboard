@@ -305,6 +305,8 @@ In Splunk ES, create a saved search named **"BOD 26-04 Vulnerability Prioritizat
 
 ```
 
+Note: lastseen_X = this is related to number of source data in EA configuration (lastseen_14,_15 = CMDB, lastseen_5 = EDR)
+
 ### The four BOD 26-04 tiers:
 
 ![BOD-Tier](images/BOD_26_04_tiers.png)
